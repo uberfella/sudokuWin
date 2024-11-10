@@ -16,13 +16,8 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Sudoku", wxPoint(30, 30), wxSize(80
     wxGridSizer* grid = new wxGridSizer(nFieldWidth, nFieldHeight, 0, 0);
 
     // Allocate memory for textCtrls and nField
-    textCtrls = new wxTextCtrl * [nFieldWidth * nFieldHeight];
-    nField = new int[nFieldWidth * nFieldHeight];
+    //textCtrls = new wxTextCtrl * [nFieldWidth * nFieldHeight];
 
-    if (!textCtrls || !nField) {
-        wxMessageBox("Memory allocation failed", "Error", wxOK | wxICON_ERROR);
-        return;
-    }
 
     wxFont font(24, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false);
 
@@ -33,33 +28,32 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Sudoku", wxPoint(30, 30), wxSize(80
             int index = i * nFieldWidth + q;
 
             // Create a wxTextCtrl with an initial value of "0"
-            textCtrls[index] = new wxTextCtrl(this, 10000 + index, "", wxDefaultPosition, wxSize(30, 30), wxTE_CENTER);
-            if (!textCtrls[index])
+            auto textCtrl = new wxTextCtrl(this, 10000 + index, "", wxDefaultPosition, wxSize(30, 30), wxTE_CENTER);
+            if (!textCtrl)
             {
                 wxMessageBox("Failed to create text control", "Error", wxOK | wxICON_ERROR);
                 continue;
             }
 
-            textCtrls[index]->SetFont(font);
-            textCtrls[index]->SetMaxLength(1); // Allow only 1 character
+            textCtrl->SetFont(font);
+            textCtrl->SetMaxLength(1); // Allow only 1 character
 
             // Add the wxTextCtrl to the grid sizer
-            grid->Add(textCtrls[index], 1, wxEXPAND | wxALL);
+            grid->Add(textCtrl, 1, wxEXPAND | wxALL);
 
-            // Initialize nField values to 0
-            nField[index] = 0;
 
             // Bind text entry event
-            textCtrls[index]->Bind(wxEVT_TEXT, &cMain::OnTextChanged, this);
-
-            if ((gridSource[i][q]) != -1) //check
-            {
-                textCtrls[index]->SetValue(wxString::Format("%d", gridSource[i][q]));
+            textCtrl->Bind(wxEVT_TEXT, &cMain::OnTextChanged, this);
+            if (gridSource[i][q] != -1) {
+                textCtrl->SetValue(wxString::Format("%d", gridSource[i][q]));
             }
+            
+            textCtrls.push_back(textCtrl);
             
 
 		}
 	}
+
 
 	this->SetSizer(grid);
 	this->Layout();
@@ -72,40 +66,31 @@ int cMain::getIndex(int i, int q)
 
 cMain::~cMain()
 {
-	if (textCtrls) {
-		for (int i = 0; i < nFieldWidth * nFieldHeight; ++i) {
-			if (textCtrls[i]) {
-				textCtrls[i]->Unbind(wxEVT_TEXT, &cMain::OnTextChanged, this);
-				delete textCtrls[i];  // Delete each wxTextCtrl individually
-			}
-		}
-		delete[] textCtrls;
-	}
-	delete[] nField;
+
 }
 
 void cMain::OnTextChanged(wxCommandEvent& evt)
 {
+
 	int id = evt.GetId() - 10000;
+    if (auto textCtrl = getTextCtrl(id))
+    {
+        wxString value = textCtrl->GetValue();
 
-	if (!textCtrls || !textCtrls[id]) return;  // Check for nullptr
+        // Validate input
+        if (!value.IsEmpty() && (value < "1" || value > "9")) {
+            wxMessageBox("Please enter a number between 1 and 9", "Invalid Input", wxOK | wxICON_WARNING);
+            textCtrl->ChangeValue("");  // ChangeValue avoids triggering another event
+            evt.Skip();
+            return;
+        }
 
-	wxString value = textCtrls[id]->GetValue();
+        if (winCondition()) {
+            wxMessageBox("Congratulations! You win! Restart the game?", "Win Condition", wxOK | wxICON_INFORMATION);
+        }
 
-    // Validate input
-    if (!value.IsEmpty() && (value < "1" || value > "9")) {
-        wxMessageBox("Please enter a number between 1 and 9", "Invalid Input", wxOK | wxICON_WARNING);
-        textCtrls[id]->ChangeValue("");  // ChangeValue avoids triggering another event
         evt.Skip();
-        return;
     }
-
-    //if (winCondition()) {
-    //    wxMessageBox("Congratulations! You win! Restart the game?", "Win Condition", wxOK | wxICON_INFORMATION);
-    //}
-
-    evt.Skip();
-
 
 }
 
@@ -235,6 +220,8 @@ std::vector <int>& cMain::pickBox(int i, int q)
         wxLogError("Invalid line index: %d");
         return firstLine; // Fallback in case of error
     }
+    return ninthBox;
+
 }
 
 int cMain::pickBoxIndex(int i, int q)
@@ -285,7 +272,7 @@ int cMain::pickBoxIndex(int i, int q)
             return 8;
         }
     }
-
+    return 0;
 }
 
 void cMain::gridParser(int grid[][9]) {
@@ -326,24 +313,6 @@ void cMain::gridParser(int grid[][9]) {
         }
     } while (notOk);
 
-    //std::uniform_int_distribution<> distrDifficulty(0, gameDifficulty); //1 = 50% 2 = 33%
-
-    //for (int i = 0; i < collectionSize; i++)
-    //{
-    //    for (int q = 0; q < collectionSize; q++)
-    //    {
-    //        //int quota = distr(gen);
-    //        int chance = distrDifficulty(gen);
-    //        if (chance != 0)
-    //        {
-    //            continue;
-    //        }
-    //        else
-    //        {
-    //            grid[i][q] = -1;
-    //        }
-    //    }
-    //}
 }
 
 bool cMain::matchCheck(int number, std::vector <int>  collection, int collectionSize) 
@@ -360,22 +329,22 @@ void cMain::gridDeleter(int gridSource[][9], int gameDifficulty)
 {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> distr(0, gameDifficulty); //1 = 50% 2 = 33%
+    std::uniform_int_distribution<> distr(0, gameDifficulty); 
 
     for (int i = 0; i < collectionSize; i++)
     {
         for (int q = 0; q < collectionSize; q++)
         {
             //int quota = distr(gen);
-            //int chance = distr(gen);
-            //if (chance != 0)
-            //{
-            //    continue;
-            //}
-            //else
-            //{
-            //    gridSource[i][q] = -1;
-            //}
+            int chance = distr(gen);
+            if (chance != 0)
+            {
+                continue;
+            }
+            else
+            {
+                gridSource[i][q] =  -1;
+            }
         }
     }
     //gridSource[0][0] = -1;
@@ -383,7 +352,7 @@ void cMain::gridDeleter(int gridSource[][9], int gameDifficulty)
 
 bool cMain::winCondition()
 {
-    if (!textCtrls) return false; // Ensure textCtrls array is allocated
+    
 
     for (int i = 0; i < collectionSize; i++)
     {
@@ -391,34 +360,26 @@ bool cMain::winCondition()
         {
             int index = i * nFieldWidth + q;
 
-            // Check if index is within bounds
-            if (index < 0 || index >= nFieldWidth * nFieldHeight) {
-                wxLogError("Index %d is out of bounds in winCondition.", index);
-                return false;
-            }
+            if (auto textCtrl = getTextCtrl(index))
+            {
 
-            // Check if the text control is initialized and non-null
-            if (!textCtrls[index]) {
-                wxLogError("textCtrls[%d] is null. Ensure all controls are properly initialized.", index);
-                return false;
-            }
 
-            // Check if the cell is filled (not empty)
-            if (textCtrls[index]->GetValue().IsEmpty()) {
-                return false;  // Player has not won if any cell is empty
-            }
+                if (textCtrl->GetValue().IsEmpty()) {
+                    return false;  // Player has not won if any cell is empty
+                }
 
-            // Convert value to integer and check against the gridFilled array
-            int value = wxAtoi(textCtrls[index]->GetValue());
+                // Convert value to integer and check against the gridFilled array
+                int value = wxAtoi(textCtrl->GetValue());
 
-            // Safely check the gridFilled value
-            if (i >= collectionSize || q >= collectionSize) {
-                wxLogError("gridFilled[%d][%d] is out of bounds.", i, q);
-                return false;
-            }
+                // Safely check the gridFilled value
+                if (i >= collectionSize || q >= collectionSize) {
+                    wxLogError("gridFilled[%d][%d] is out of bounds.", i, q);
+                    return false;
+                }
 
-            if (value != gridFilled[i][q]) {
-                return false;  // Mismatch found, player has not won
+                if (value != gridFilled[i][q]) {
+                    return false;  // Mismatch found, player has not won
+                }
             }
         }
     }
@@ -426,3 +387,28 @@ bool cMain::winCondition()
     return true;  // All cells are filled correctly, player wins
 }
 
+wxTextCtrl* cMain::getTextCtrl(int index)
+{
+    if (textCtrls.size() > index)
+    {
+        return textCtrls[index];
+    }
+    return nullptr;
+}
+
+/*
+Row (y)	Column (x)	Computed Index (y * nFieldWidth + x)
+0	0	0
+0	1	1
+0	2	2
+...	...	...
+0	8	8
+1	0	9
+1	1	10
+1	2	11
+...	...	...
+1	8	17
+2	0	18
+...	...	...
+8	8	80
+*/

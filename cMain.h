@@ -18,8 +18,8 @@ public:
 	int nFieldWidth = 9;
 	int nFieldHeight = 9;
 	//wxButton** btn;
-	wxTextCtrl** textCtrls;
-	int* nField = nullptr;
+	std::vector <wxTextCtrl*>  textCtrls;
+	wxTextCtrl* getTextCtrl(int index);
 	bool bFirstClick = true;
 	bool victory = false;
 
